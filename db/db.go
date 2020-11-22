@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/boltdb/bolt"
 )
@@ -74,6 +75,9 @@ func ListTasks() ([]Task, error) {
 func DeleteTask(key int) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(bkt)
+		if bucket.Get(itob(key)) == nil {
+			return fmt.Errorf("task with id %d does not exist", key)
+		}
 		return bucket.Delete(itob(key))
 	})
 }
