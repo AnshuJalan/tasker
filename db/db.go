@@ -1,6 +1,8 @@
 package db
 
 import (
+	"encoding/binary"
+
 	"github.com/boltdb/bolt"
 )
 
@@ -27,43 +29,30 @@ func Init(dbPath string) error {
 	})
 }
 
-// //AddTask adds a new task to the boltDB database
-// func AddTask(task string) error {
-// 	db, err := bolt.Open("taskDB.db", 0600, nil)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer db.Close()
+//AddTask inserts a new task into the database
+func AddTask(task string) (int, error) {
+	var id int
 
-// 	//add task
-// 	err = db.Update(func(tx *bolt.Tx) error {
-// 		bucket, err := tx.CreateBucketIfNotExists(bkt)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		id := bucket.Stats().KeyN
-// 		return bucket.Put([]byte(strconv.Itoa(id+1)), []byte(task))
-// 	})
+	err := db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bkt)
+		id64, _ := bucket.NextSequence()
+		id = int(id64)
+		key := itob(id)
+		return bucket.Put(key, []byte(task))
+	})
 
-// 	return err
-// }
+	return id, err
+}
 
-// //ListTasks lists all incomplete tasks
-// func ListTasks() []string {
-// 	db, _ := bolt.Open("taskDB.db", 0600, nil)
-// 	defer db.Close()
+//converts integer to byte slice
+func itob(v int) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(v))
+	return b
+}
 
-// 	var allTasks []string
-
-// 	db.View(func(tx *bolt.Tx) error {
-// 		b := tx.Bucket(bkt)
-// 		c := b.Cursor()
-
-// 		for k, v := c.First(); k != nil; k, v = c.Next() {
-// 			allTasks = append(allTasks, string(v))
-// 		}
-// 		return nil
-// 	})
-
-// 	return allTasks
-// }
+//converst byte slice to integer
+func btoi(b []byte) int {
+	val := binary.BigEndian.Uint64(b)
+	return int(val)
+}
