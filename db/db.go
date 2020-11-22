@@ -41,7 +41,41 @@ func AddTask(task string) (int, error) {
 		return bucket.Put(key, []byte(task))
 	})
 
-	return id, err
+	if err != nil {
+		return -1, err
+	}
+	return id, nil
+}
+
+//ListTasks returns a slice of Task struct representing the
+//incomplete tasks
+func ListTasks() ([]Task, error) {
+	var tasks []Task
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bkt)
+		c := bucket.Cursor()
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			tasks = append(tasks, Task{
+				btoi(k),
+				string(v),
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
+//DeleteTask removes completed task from the database
+func DeleteTask(key int) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(bkt)
+		return bucket.Delete(itob(key))
+	})
 }
 
 //converts integer to byte slice
