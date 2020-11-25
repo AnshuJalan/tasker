@@ -3,11 +3,13 @@ package db
 import (
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/boltdb/bolt"
 )
 
-var bkt = []byte("allTasks")
+var mainBkt = []byte("allTasks")
+var doneBkt = []byte("completedTasks")
 
 var db *bolt.DB
 
@@ -25,7 +27,11 @@ func Init(dbPath string) error {
 		return err
 	}
 	return db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bkt)
+		_, err = tx.CreateBucketIfNotExists(mainBkt)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists(doneBkt)
 		return err
 	})
 }
@@ -35,7 +41,7 @@ func AddTask(task string) (int, error) {
 	var id int
 
 	err := db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bkt)
+		bucket := tx.Bucket(mainBkt)
 		id64, _ := bucket.NextSequence()
 		id = int(id64)
 		key := itob(id)
@@ -53,7 +59,7 @@ func AddTask(task string) (int, error) {
 func ListTasks() ([]Task, error) {
 	var tasks []Task
 	err := db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bkt)
+		bucket := tx.Bucket(mainBkt)
 		c := bucket.Cursor()
 
 		for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -71,15 +77,40 @@ func ListTasks() ([]Task, error) {
 	return tasks, nil
 }
 
-//DeleteTask removes completed task from the database
-func DeleteTask(key int) error {
+//RemoveTask removes completed task from the database
+func RemoveTask(key int) error {
 	return db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(bkt)
+		bucket := tx.Bucket(mainBkt)
 		if bucket.Get(itob(key)) == nil {
 			return fmt.Errorf("task with id %d does not exist", key)
 		}
 		return bucket.Delete(itob(key))
 	})
+}
+
+//DoTask marks a task as complete and puts it
+//in the done bucket of the database
+func DoTask(key int) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		mainBucket := tx.Bucket(mainBkt)
+		doneBucket := tx.Bucket(doneBkt)
+		if mainBucket.Get(itob(key)) == nil {
+			return fmt.Errorf("task with id %d does not exist", key)
+		}
+		doneBucket.Put(mainBucket.Get(itob(key)), timetob(time.Now()))
+		return mainBucket.Delete(itob(key))
+	})
+}
+
+//Size returns the number of entries in the main bucket
+func Size() int {
+	var size int
+	db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(mainBkt)
+		size = bucket.Stats().KeyN
+		return nil
+	})
+	return size
 }
 
 //converts integer to byte slice
@@ -89,8 +120,14 @@ func itob(v int) []byte {
 	return b
 }
 
-//converst byte slice to integer
+//converts byte slice to integer
 func btoi(b []byte) int {
 	val := binary.BigEndian.Uint64(b)
 	return int(val)
+}
+
+//encodes time to byte array
+func timetob(t time.Time) []byte {
+	val, _ := t.GobEncode()
+	return val
 }
