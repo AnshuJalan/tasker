@@ -19,6 +19,12 @@ type Task struct {
 	Value string
 }
 
+//CompletedTask defines a task that is marked done
+type CompletedTask struct {
+	Value     string
+	Completed time.Time
+}
+
 //Init opens up a connection the database
 func Init(dbPath string) error {
 	var err error
@@ -66,6 +72,29 @@ func ListTasks() ([]Task, error) {
 			tasks = append(tasks, Task{
 				btoi(k),
 				string(v),
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
+}
+
+//ListCompletedTasks returns a list of tasks completed
+//in the past day
+func ListCompletedTasks() ([]CompletedTask, error) {
+	var tasks []CompletedTask
+	err := db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(doneBkt)
+		c := bucket.Cursor()
+
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			tasks = append(tasks, CompletedTask{
+				string(k),
+				btotime(v),
 			})
 		}
 		return nil
@@ -130,4 +159,11 @@ func btoi(b []byte) int {
 func timetob(t time.Time) []byte {
 	val, _ := t.GobEncode()
 	return val
+}
+
+//decodes the byte array of time
+func btotime(b []byte) time.Time {
+	var t time.Time
+	t.GobDecode(b)
+	return t
 }

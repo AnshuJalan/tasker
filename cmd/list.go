@@ -24,7 +24,6 @@ var listCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Println("--Your Tasks--")
 		fmt.Printf("ID\tTASK\n--\t----\n")
 		for i, task := range tasks {
 			fmt.Printf("%d\t%s\n", i+1, task.Value)

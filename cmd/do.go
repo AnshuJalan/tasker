@@ -10,7 +10,7 @@ import (
 )
 
 var doCmd = &cobra.Command{
-	Use:   "do <task id>",
+	Use:   "do",
 	Short: "Marks a task as complete",
 	Long:  "Marks a task on the TODO list as complete.",
 	RunE: func(cmd *cobra.Command, args []string) error {
